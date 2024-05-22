@@ -257,6 +257,416 @@
 
 ---
 
+### 8. Custom Rule
+
+-   Kita bisa membuat custom rule jika memang diperlukan,
+
+-   Gunakan perintah `php artisan make:rule NamaRule`.
+
+-   Nanti akan dibuatkan folder di `app/Rules`.
+
+-   Kode Membuat Rule
+
+    ```PHP
+     public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if ($value !== strtoupper($value)) {
+            $fail("The $attribute must be UPPERCASE");
+        }
+    }
+    ```
+
+-   Kode Menggunakan Custom Rule
+
+    ```PHP
+    public function testValidatorCustomRule()
+    {
+        $data = [
+            "username" => "gusti@hofi.com",
+            "password" => "gusti@hofi.com"
+        ];
+
+        $rules = [
+            "username" => ["required", "email", "max:100",
+            "password" => ["required", "min:6", "max:20"()]
+        ];
+
+        $validator = Validator::make($data, $rules);
+        self::assertNotNull($validator);
+
+        self::assertFalse($validator->passes());
+        self::assertTrue($validator->fails());
+
+        $message = $validator->getMessageBag();
+
+        Log::info($message->toJson(JSON_PRETTY_PRINT));
+    }
+    ```
+
+---
+
+### 9. Translation
+
+-   Saat membuat custom rule, _function_ validate terdapat _parameter_ ke-3 berupa _Closure_,
+
+-   _Closure_ tersebut jika dipanggil, maka mengembalikan object `PotentialTranslatedString`.
+
+-   Link: https://laravel.com/docs/11.x/localization#defining-translation-strings
+
+-   Tambahkan validasi di folder `lang/en/validation.php`.
+
+    ```PHP
+        'custom.uppercase' => 'The :attribute field with value :value must be UPPERCASE',
+    ```
+
+-   Kode Uppercase Rule
+
+    ```PHP
+     public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if ($value !== strtoupper($value)) {
+            $fail("validation.custom.uppercase")->translate([
+                "attribute" => $attribute,
+                "value" => $value
+            ]);
+        }
+    }
+    ```
+
+---
+
+### 10. Data Aware & Validation Aware
+
+-   Saat membutuhkan custom rule yang membutuhkan bisa melihat seluruh data yang di validasi, bisa implementasi interface `DataAwareRule`,
+
+-   Dan jika kita butuh object Validator, kita bisa implemantasi interface `ValidatorAwareRule`.
+
+-   Perintah Membuat Rule Registration `php artisan make:rule RegistrationRule`.
+
+-   Kode Registration Rule 1
+
+    ```PHP
+    class RegistrationRule implements ValidationRule, DataAwareRule, ValidatorAwareRule
+    {
+        private array $data;
+        private Validator $validator;
+
+        public function setData(array $data): RegistrationRule
+        {
+            $this->data = $data;
+            return $this;
+        }
+
+        public function setValidator(Validator $validator): RegistrationRule
+        {
+            $this->validator = $validator;
+            return $this;
+        }
+
+        public function validate(string $attribute, mixed $value, Closure $fail): void
+        {
+            $password = $value;
+            $username = $this->data['username'];
+
+            if($password == $username){
+                $fail("$attribute must be different with username");
+            }
+        }
+    }
+    ```
+
+-   Kode Menggunakan Registration Rule
+
+    ```PHP
+    public function testValidatorCustomRule()
+    {
+        $data = [
+            "username" => "gusti@hofi.com",
+            "password" => "gusti@hofi.com"
+        ];
+
+        $rules = [
+            "username" => ["required", "email", "max:100", new Uppercase()], // new Uppercase()
+            "password" => ["required", "min:6", "max:20", new RegistrationRule()] // new RegistrationRule()
+        ];
+
+        $validator = Validator::make($data, $rules);
+        self::assertNotNull($validator);
+
+        self::assertFalse($validator->passes());
+        self::assertTrue($validator->fails());
+
+        $message = $validator->getMessageBag();
+
+        Log::info($message->toJson(JSON_PRETTY_PRINT));
+    }
+    ```
+
+---
+
+### 11. Custom Function Rule
+
+-   Pada kasus kita perlu membuat custom rule, namun jika membuat _class rule_ terlalu berlebihan kita bisa menggunakan _custom function rule_ ketika membuat rule,
+
+-   Gunakan _function_ dimana terdapat 3 _parameter_ `$attribute`, `$value` dan `$fail`.
+
+-   Kode Custom Function Rule
+
+    ```PHP
+    public function testValidatorCustomFunctionRule()
+    {
+        $data = [
+            "username" => "gusti@hofi.com",
+            "password" => "gusti@hofi.com"
+        ];
+
+        $rules = [
+            "username" => ["required", "email", "max:100", function(string $attribute, string $value, \Closure $fail){
+                if(strtoupper($value) != $value){
+                    $fail("The field $attribute must be UPPERCASE");
+                }
+            }],
+            "password" => ["required", "min:6", "max:20", new RegistrationRule()]
+        ];
+
+        $validator = Validator::make($data, $rules);
+        self::assertNotNull($validator);
+
+        self::assertFalse($validator->passes());
+        self::assertTrue($validator->fails());
+
+        $message = $validator->getMessageBag();
+
+        Log::info($message->toJson(JSON_PRETTY_PRINT));
+    }
+    ```
+
+---
+
+### 12. Nested Array Validation
+
+-   Saat membuat validasi data yang di validasi tidak hanya berformat _key-value_, kadang terdapat _nested array_, seperti _key address_ dimana didalamnya dapat berisi _array_ lagi.
+
+-   Pada kasus data jenis _nested array_, kita bisa membuat Rule menggunakan `.` (titik), misalnya `address.street`, `address.city` dll.
+
+-   Kode Nested Array Validation
+
+    ```PHP
+    public function testNestedArray()
+    {
+        $data = [
+            "name" => [
+                "first" => "Gusti",
+                "last" => "Akbar"
+            ],
+            "address" => [
+                "street" => "Jalan. Mangga",
+                "city" => "Jakarta",
+                "country" => "Indonesia"
+            ]
+        ];
+
+        $rules = [
+            "name.first" => ["required", "max:100"],
+            "name.last" => ["max:100"],
+            "address.street" => ["max:200"],
+            "address.city" => ["required", "max:100"],
+            "address.country" => ["required", "max:100"],
+        ];
+
+        $validator = Validator::make($data, $rules);
+        self::assertTrue($validator->passes());
+    }
+    ```
+
+---
+
+### 13. Index Array Validation
+
+-   Saat nested array nya adalah _indexed_, artinya bisa lebih dari satu,
+
+-   Pada kasus ini, tidak lagi menggunakan `.` (titik), melaikan menggunakan `*` (bintang).
+
+-   Kode Index Array Validation
+
+    ```PHP
+    public function testNestedIndexedArray()
+    {
+        $data = [
+            "name" => [
+                "first" => "Gusti",
+                "last" => "Akbar"
+            ],
+            "address" => [
+                [
+                    "street" => "Jalan. Mangga",
+                    "city" => "Jakarta",
+                    "country" => "Indonesia"
+                ],
+                [
+                    "street" => "Jalan. Manggis",
+                    "city" => "Jakarta",
+                    "country" => "Indonesia"
+                ]
+            ]
+        ];
+    }
+    ```
+
+---
+
+### 14. HTTP Request Validation
+
+-   Laravel Validator sudah terintegrasi baik dengan HTTP Request di Laravel,
+
+-   Class request memiliki method `validate()` untuk melakukan validasi data request yang dikirim oleh _User_, misal dari From atau Query Parameter.
+
+-   Sebelum membuat http request, kita harus membuat _controller_ nya terlebih dahulu. `php artisan make:controller FormController`.
+
+-   Link: https://laravel.com/docs/11.x/requests#retrieving-an-input-value
+
+-   Kode Form Controller
+
+    ```PHP
+    public function login(Request $request): Response
+    {
+        try {
+            $rules = [
+                "username" => "required",
+                "password" => "required"
+            ];
+
+            $data = $request->validate($rules);
+            // data
+            return response("OK", Response::HTTP_OK);
+        }catch (ValidationException $validationException){
+            return response($validationException->errors(), Response::HTTP_BAD_REQUEST);
+        }
+    }
+    ```
+
+-   Kode Route
+
+    ```PHP
+    Route::post('/form/login', [\App\Http\Controllers\FormController::class, 'login']);
+    ```
+
+-   Unit Test HTTP Request Validation
+
+    ```PHP
+    public function testLoginFailed() // login gagal
+    {
+        $response = $this->post('/form/login', [
+            'username' => '',
+            'password' => ''
+        ]);
+        $response->assertStatus(400);
+    }
+
+    public function testLoginSuccess() // login berhasil
+    {
+        $response = $this->post('/form/login', [
+            'username' => 'admin',
+            'password' => 'rahasia'
+        ]);
+        $response->assertStatus(200);
+    }
+    ```
+
+---
+
+### 15. Error Page
+
+-   Kita bisa menampilkan _error_ dari `MessageBag` di `Laravel Blade Template`,
+
+-   Cukup gunakan _variable_ `$errors` di `Blade Template`.
+
+-   Kode Form Blade Template
+
+    ```PHP
+    @if ($errors->any())
+        <ul>
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    @endif
+
+    <form action="/form" method="post">
+        @csrf
+        <label>Username : @error('username')
+                {{ $message }}
+            @enderror
+            <input type="text" name="username" value="{{ old('username') }}"></label> <br>
+        <label>Password : @error('password')
+                {{ $message }}
+            @enderror
+            <input type="password" name="password" value="{{ old('password') }}"></label><br>
+        <input type="submit" value="Login">
+    </form>
+    ```
+
+-   Kode Login Controller
+
+    ```PHP
+    public function form(): Response {
+        return response()->view("form");
+    }
+
+    public function submitForm(Request $request): Response
+    {
+        $data = $request->validate([
+            "username" => "required",
+            "password" => "required"
+        ]);
+        return response("OK", response::HTTP_OK);
+    }
+    ```
+
+-   Unit Test Error Page
+
+    ```PHP
+    public function testFormFailed() // tampil form gagal
+    {
+        $response = $this->post('/form', [
+            'username' => '',
+            'password' => ''
+        ]);
+        $response->assertStatus(302);
+    }
+
+    public function testFormSuccess() // tampil form berhasil
+    {
+        $response = $this->post('/form', [
+            'username' => 'admin',
+            'password' => 'rahasia'
+        ]);
+        $response->assertStatus(200);
+    }
+    ```
+
+---
+
+### 16. Membuat Form Request
+
+-   Untuk membuat Form Request sendiri bisa gunakan perintah `php artisan make:request NamaFormRequest`.
+
+-   Nanti akan dibuat kan folder baru di `app/Http/Request`
+
+-   Kode Login Request 1
+
+    ```PHP
+    public function rules(): array
+    {
+        return [
+            "username" => ["required", "email", "max:100"],
+            "password" => ["required", Password::min(6)->letters()->numbers()->symbols()]
+        ];
+    }
+    ```
+
+---
+
 ## PERTANYAAN & CATATAN TAMBAHAN
 
 -   Catatan Tambahan:
