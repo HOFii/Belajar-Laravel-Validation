@@ -113,7 +113,7 @@
 
 -   Saat menggunakan validator Laravel juga sudah disediakan rules yang bia digunakan untuk membuat validasi.
 
--   Link: https://laravel.com/docs/11.x/validation#main-content
+-   Link: [Validator](https://laravel.com/docs/11.x/validation#main-content)
 
 ---
 
@@ -311,7 +311,7 @@
 
 -   _Closure_ tersebut jika dipanggil, maka mengembalikan object `PotentialTranslatedString`.
 
--   Link: https://laravel.com/docs/11.x/localization#defining-translation-strings
+-   Link: [Translation](https://laravel.com/docs/11.x/localization#defining-translation-strings)
 
 -   Tambahkan validasi di folder `lang/en/validation.php`.
 
@@ -523,7 +523,7 @@
 
 -   Sebelum membuat http request, kita harus membuat _controller_ nya terlebih dahulu. `php artisan make:controller FormController`.
 
--   Link: https://laravel.com/docs/11.x/requests#retrieving-an-input-value
+-   Link: [HTTP](https://laravel.com/docs/11.x/requests#retrieving-an-input-value)
 
 -   Kode Form Controller
 
